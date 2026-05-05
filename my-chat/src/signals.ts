@@ -33,6 +33,32 @@ export const agentInitials = computed(() =>
 export const agentAvatar = computed(() => agent.value?.avatar);
 export const agentDescription = computed(() => agent.value?.description);
 
+type Message = AgentMessage | UserMessage;
+
+const appendText = (current: string, next: string) => {
+  if (!current) {
+    return next;
+  }
+  if (!next) {
+    return current;
+  }
+  if (/\s$/.test(current) || /^\s|[.,!?;:)]/.test(next)) {
+    return `${current}${next}`;
+  }
+  return `${current} ${next}`;
+};
+
+const upsertAgentMessage = (msgs: Message[], message: AgentMessage) => {
+  const last = msgs.at(-1);
+
+  if (last?.type !== "agent-message") {
+    return [...msgs, message];
+  }
+
+  last.text = appendText(last.text, message.text);
+  return [...msgs.slice(0, -1), last];
+};
+
 // Persist dark mode preference
 effect(() => {
   localStorage.setItem("darkMode", isDarkMode.value.toString());
@@ -68,7 +94,7 @@ effect(() => {
         (m) => m.type === "user-message" && m.id === "optimistic",
       );
 
-      if (optimistic) {
+      if (optimistic && message.type === "user-message") {
         const i = msgs.indexOf(optimistic);
         const copy = msgs.concat();
         copy.splice(i, 1, message);
@@ -76,7 +102,10 @@ effect(() => {
         messages.value = copy;
         isAgentTyping.value = true;
       } else {
-        messages.value = [...msgs, message];
+        messages.value =
+          message.type === "agent-message"
+            ? upsertAgentMessage(msgs, message)
+            : [...msgs, message];
 
         if (message.type === "agent-message") {
           isAgentTyping.value = false;
