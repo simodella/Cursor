@@ -35,28 +35,51 @@ export const agentDescription = computed(() => agent.value?.description);
 
 type Message = AgentMessage | UserMessage;
 
-const appendText = (current: string, next: string) => {
+const mergeText = (current: string, next: string) => {
   if (!current) {
     return next;
   }
   if (!next) {
     return current;
   }
+
+  if (next === current || current.endsWith(next)) {
+    return current;
+  }
+  if (next.startsWith(current)) {
+    return next;
+  }
   if (/\s$/.test(current) || /^\s|[.,!?;:)]/.test(next)) {
     return `${current}${next}`;
   }
+
   return `${current} ${next}`;
 };
 
 const upsertAgentMessage = (msgs: Message[], message: AgentMessage) => {
+  const existingIndex = msgs.findIndex(
+    (m) => m.type === "agent-message" && m.id === message.id,
+  );
+
+  if (existingIndex >= 0) {
+    const copy = msgs.concat();
+    message.text = mergeText(
+      (copy[existingIndex] as AgentMessage).text,
+      message.text,
+    );
+    copy.splice(existingIndex, 1, message);
+
+    return copy;
+  }
+
   const last = msgs.at(-1);
 
   if (last?.type !== "agent-message") {
     return [...msgs, message];
   }
 
-  last.text = appendText(last.text, message.text);
-  return [...msgs.slice(0, -1), last];
+  message.text = mergeText(last.text, message.text);
+  return [...msgs.slice(0, -1), message];
 };
 
 // Persist dark mode preference
