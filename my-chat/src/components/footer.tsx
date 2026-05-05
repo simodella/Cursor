@@ -2,7 +2,14 @@ import type { UserMessage } from "@relevanceai/sdk";
 import { SendHorizonal } from "lucide-react";
 import type { SubmitEventHandler } from "preact";
 import { useCallback, useRef } from "preact/hooks";
-import { agent, isAgentTyping, messages, task, workforce } from "@/signals";
+import {
+  agent,
+  isAgentTyping,
+  isAwaitingAgentResponse,
+  messages,
+  task,
+  workforce,
+} from "@/signals";
 
 export function Footer() {
   const input = useRef<HTMLInputElement>();
@@ -11,7 +18,7 @@ export function Footer() {
     async (e) => {
       e.preventDefault();
 
-      if (isAgentTyping.value) {
+      if (isAwaitingAgentResponse.value) {
         return;
       }
 
@@ -33,9 +40,11 @@ export function Footer() {
         } as UserMessage,
       ];
       isAgentTyping.value = true;
+      isAwaitingAgentResponse.value = true;
 
       if (!workforce.value && !agent.value) {
         isAgentTyping.value = false;
+        isAwaitingAgentResponse.value = false;
         return;
       }
 

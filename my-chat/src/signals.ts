@@ -15,6 +15,7 @@ export const workforce = signal<Workforce>();
 export const task = signal<Task>();
 export const messages = signal<(AgentMessage | UserMessage)[]>([]);
 export const isAgentTyping = signal(false);
+export const isAwaitingAgentResponse = signal(false);
 export const isDarkMode = signal(
   localStorage.getItem("darkMode") === "true" ||
     (localStorage.getItem("darkMode") === "false"
@@ -36,6 +37,8 @@ export const agentDescription = computed(() => agent.value?.description);
 type Message = AgentMessage | UserMessage;
 
 const OPTIMISTIC_MESSAGE_ID = "optimistic";
+const AGENT_RESPONSE_IDLE_MS = 750;
+let agentResponseIdleTimeout: ReturnType<typeof setTimeout> | undefined;
 
 const mergeText = (current: string, next: string) => {
   if (!current) {
@@ -58,10 +61,12 @@ const mergeText = (current: string, next: string) => {
   return `${current} ${next}`;
 };
 
-const toAgentMessage = (message: Message) =>
+const toAgentMessage = (message: Message, text = message.text || "") =>
   ({
-    ...message,
+    id: message.id,
     type: "agent-message",
+    text,
+    createdAt: message.createdAt || new Date(),
     isAgent: () => true,
   }) as AgentMessage;
 
@@ -72,11 +77,11 @@ const upsertAgentMessage = (msgs: Message[], message: AgentMessage) => {
 
   if (existingIndex >= 0) {
     const copy = msgs.concat();
-    message.text = mergeText(
+    const text = mergeText(
       (copy[existingIndex] as AgentMessage).text,
       message.text,
     );
-    copy.splice(existingIndex, 1, message);
+    copy.splice(existingIndex, 1, toAgentMessage(message, text));
 
     return copy;
   }
@@ -87,8 +92,10 @@ const upsertAgentMessage = (msgs: Message[], message: AgentMessage) => {
     return [...msgs, message];
   }
 
-  message.text = mergeText(last.text, message.text);
-  return [...msgs.slice(0, -1), message];
+  return [
+    ...msgs.slice(0, -1),
+    toAgentMessage(message, mergeText(last.text, message.text)),
+  ];
 };
 
 const findOptimisticMessage = (msgs: Message[]) =>
@@ -135,6 +142,19 @@ const hasUserMessage = (msgs: Message[], message: UserMessage) =>
       m.text === message.text,
   );
 
+const markAgentResponseChunkReceived = () => {
+  isAgentTyping.value = false;
+
+  if (agentResponseIdleTimeout) {
+    clearTimeout(agentResponseIdleTimeout);
+  }
+
+  agentResponseIdleTimeout = setTimeout(() => {
+    isAwaitingAgentResponse.value = false;
+    agentResponseIdleTimeout = undefined;
+  }, AGENT_RESPONSE_IDLE_MS);
+};
+
 // Persist dark mode preference
 effect(() => {
   localStorage.setItem("darkMode", isDarkMode.value.toString());
@@ -175,6 +195,7 @@ effect(() => {
       ) {
         messages.value = replaceOptimisticMessage(msgs, message);
         isAgentTyping.value = true;
+        isAwaitingAgentResponse.value = true;
 
         return;
       }
@@ -186,13 +207,13 @@ effect(() => {
       const nextMessages = optimistic ? finalizeOptimisticMessage(msgs) : msgs;
       const shouldRenderAsAgent =
         message.type === "agent-message" ||
-        isAgentTyping.value ||
+        isAwaitingAgentResponse.value ||
         optimistic ||
         nextMessages.at(-1)?.type === "agent-message";
 
       if (shouldRenderAsAgent) {
         messages.value = upsertAgentMessage(nextMessages, toAgentMessage(message));
-        isAgentTyping.value = false;
+        markAgentResponseChunkReceived();
       } else {
         messages.value = [...nextMessages, message];
       }
