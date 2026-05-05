@@ -35,6 +35,8 @@ export const agentDescription = computed(() => agent.value?.description);
 
 type Message = AgentMessage | UserMessage;
 
+const OPTIMISTIC_MESSAGE_ID = "optimistic";
+
 const mergeText = (current: string, next: string) => {
   if (!current) {
     return next;
@@ -55,6 +57,13 @@ const mergeText = (current: string, next: string) => {
 
   return `${current} ${next}`;
 };
+
+const toAgentMessage = (message: Message) =>
+  ({
+    ...message,
+    type: "agent-message",
+    isAgent: () => true,
+  }) as AgentMessage;
 
 const upsertAgentMessage = (msgs: Message[], message: AgentMessage) => {
   const existingIndex = msgs.findIndex(
@@ -81,6 +90,50 @@ const upsertAgentMessage = (msgs: Message[], message: AgentMessage) => {
   message.text = mergeText(last.text, message.text);
   return [...msgs.slice(0, -1), message];
 };
+
+const findOptimisticMessage = (msgs: Message[]) =>
+  msgs.find(
+    (m): m is UserMessage =>
+      m.type === "user-message" && m.id === OPTIMISTIC_MESSAGE_ID,
+  );
+
+const replaceOptimisticMessage = (msgs: Message[], message: UserMessage) => {
+  const optimistic = findOptimisticMessage(msgs);
+
+  if (!optimistic) {
+    return msgs;
+  }
+
+  const copy = msgs.concat();
+  copy.splice(msgs.indexOf(optimistic), 1, message);
+
+  return copy;
+};
+
+const finalizeOptimisticMessage = (msgs: Message[]) => {
+  const optimistic = findOptimisticMessage(msgs);
+
+  if (!optimistic) {
+    return msgs;
+  }
+
+  const copy = msgs.concat();
+  copy.splice(msgs.indexOf(optimistic), 1, {
+    ...optimistic,
+    id: `local-${optimistic.createdAt.getTime()}`,
+    isAgent: () => false,
+  } as UserMessage);
+
+  return copy;
+};
+
+const hasUserMessage = (msgs: Message[], message: UserMessage) =>
+  msgs.some(
+    (m) =>
+      m.type === "user-message" &&
+      m.id !== OPTIMISTIC_MESSAGE_ID &&
+      m.text === message.text,
+  );
 
 // Persist dark mode preference
 effect(() => {
@@ -113,26 +166,35 @@ effect(() => {
     t.addEventListener("message", ({ detail }) => {
       const { message } = detail;
       const msgs = messages.value;
-      const optimistic = msgs.find(
-        (m) => m.type === "user-message" && m.id === "optimistic",
-      );
+      const optimistic = findOptimisticMessage(msgs);
 
-      if (optimistic && message.type === "user-message") {
-        const i = msgs.indexOf(optimistic);
-        const copy = msgs.concat();
-        copy.splice(i, 1, message);
-
-        messages.value = copy;
+      if (
+        optimistic &&
+        message.type === "user-message" &&
+        message.text === optimistic.text
+      ) {
+        messages.value = replaceOptimisticMessage(msgs, message);
         isAgentTyping.value = true;
-      } else {
-        messages.value =
-          message.type === "agent-message"
-            ? upsertAgentMessage(msgs, message)
-            : [...msgs, message];
 
-        if (message.type === "agent-message") {
-          isAgentTyping.value = false;
-        }
+        return;
+      }
+
+      if (message.type === "user-message" && hasUserMessage(msgs, message)) {
+        return;
+      }
+
+      const nextMessages = optimistic ? finalizeOptimisticMessage(msgs) : msgs;
+      const shouldRenderAsAgent =
+        message.type === "agent-message" ||
+        isAgentTyping.value ||
+        optimistic ||
+        nextMessages.at(-1)?.type === "agent-message";
+
+      if (shouldRenderAsAgent) {
+        messages.value = upsertAgentMessage(nextMessages, toAgentMessage(message));
+        isAgentTyping.value = false;
+      } else {
+        messages.value = [...nextMessages, message];
       }
     });
   }

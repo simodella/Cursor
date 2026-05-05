@@ -19,7 +19,7 @@ export function App() {
         <div class="max-w-3xl mx-auto flex flex-col gap-y-4">
           <For each={messages} fallback={<EmptyState />}>
             {(m) =>
-              m.isAgent() ? (
+              m.type === "agent-message" ? (
                 <AgentMessage message={m as AgentMessageType} />
               ) : (
                 <UserMessage message={m as UserMessageType} />

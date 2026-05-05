@@ -32,8 +32,10 @@ export function Footer() {
           isAgent: () => false,
         } as UserMessage,
       ];
+      isAgentTyping.value = true;
 
       if (!workforce.value && !agent.value) {
+        isAgentTyping.value = false;
         return;
       }
 
