@@ -11,16 +11,51 @@ import {
   workforce,
 } from "@/signals";
 
+const QUICK_ACTIONS = ["Call Me Now", "Book a Demo"] as const;
+
 export function Footer() {
   const input = useRef<HTMLInputElement>();
+
+  const sendMessage = useCallback(async (message: string) => {
+    if (isAwaitingAgentResponse.value) {
+      return;
+    }
+
+    messages.value = [
+      ...messages.value,
+      {
+        id: "optimistic",
+        type: "user-message",
+        text: message,
+        createdAt: new Date(),
+        isAgent: () => false,
+      } as UserMessage,
+    ];
+    isAgentTyping.value = true;
+    isAwaitingAgentResponse.value = true;
+
+    if (!workforce.value && !agent.value) {
+      isAgentTyping.value = false;
+      isAwaitingAgentResponse.value = false;
+      return;
+    }
+
+    const t = workforce.value
+      ? await workforce.value.sendMessage(message, task.value)
+      : await agent.value!.sendMessage(message, task.value);
+    if (task.value !== t) {
+      task.value = t;
+    }
+
+    if (input.current) {
+      input.current.value = "";
+      input.current.focus();
+    }
+  }, []);
 
   const handleSubmit = useCallback<SubmitEventHandler<HTMLFormElement>>(
     async (e) => {
       e.preventDefault();
-
-      if (isAwaitingAgentResponse.value) {
-        return;
-      }
 
       const form = e.currentTarget;
       const data = new FormData(form);
@@ -29,46 +64,29 @@ export function Footer() {
         return;
       }
 
-      messages.value = [
-        ...messages.value,
-        {
-          id: "optimistic",
-          type: "user-message",
-          text: message,
-          createdAt: new Date(),
-          isAgent: () => false,
-        } as UserMessage,
-      ];
-      isAgentTyping.value = true;
-      isAwaitingAgentResponse.value = true;
-
-      if (!workforce.value && !agent.value) {
-        isAgentTyping.value = false;
-        isAwaitingAgentResponse.value = false;
-        return;
-      }
-
-      const t = workforce.value
-        ? await workforce.value.sendMessage(message, task.value)
-        : await agent.value!.sendMessage(message, task.value);
-      if (task.value !== t) {
-        task.value = t;
-      }
-
-      if (input.current) {
-        input.current.value = "";
-        input.current.focus();
-      }
+      await sendMessage(message);
     },
-    [input],
+    [sendMessage],
   );
 
   return (
     <footer class="p-4 border-t border-zinc-500/25 sticky bottom-0 bg-white dark:bg-zinc-900 transition-colors">
-      <form
-        class="max-w-3xl mx-auto flex items-center gap-x-2"
-        onSubmit={handleSubmit}
-      >
+      <div class="max-w-3xl mx-auto flex flex-wrap gap-2 mb-3">
+        {QUICK_ACTIONS.map((action) => (
+          <button
+            key={action}
+            type="button"
+            class="rounded-full border border-indigo-500/30 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 active:bg-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/30 dark:bg-indigo-950 dark:text-indigo-200 dark:hover:bg-indigo-900 dark:active:bg-indigo-800"
+            disabled={isAwaitingAgentResponse.value}
+            onClick={() => {
+              void sendMessage(action);
+            }}
+          >
+            {action}
+          </button>
+        ))}
+      </div>
+      <form class="max-w-3xl mx-auto flex items-center gap-x-2" onSubmit={handleSubmit}>
         <input
           ref={input}
           type="text"
