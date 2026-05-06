@@ -26,9 +26,9 @@ export function App() {
         }}
       />
 
-      <Show when={isChatOpen}>
+      {isChatOpen ? (
         <section
-          class="fixed inset-x-3 bottom-24 z-30 flex h-[min(42rem,calc(100dvh-7rem))] flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-2xl shadow-zinc-950/20 sm:inset-x-auto sm:right-6 sm:w-[27rem] dark:border-zinc-800 dark:bg-zinc-900"
+          class="fixed inset-x-3 bottom-24 z-50 flex h-[min(42rem,calc(100dvh-7rem))] flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-2xl shadow-zinc-950/20 sm:inset-x-auto sm:right-6 sm:w-[27rem] dark:border-zinc-800 dark:bg-zinc-900"
           aria-label="Chat popup"
         >
           <div class="relative">
@@ -70,14 +70,14 @@ export function App() {
             </main>
           )}
         </section>
-      </Show>
+      ) : null}
 
       <button
         type="button"
         onClick={() => {
           setIsChatOpen((open) => !open);
         }}
-        class="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-4 font-semibold text-white shadow-2xl shadow-indigo-900/30 transition hover:-translate-y-0.5 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus:ring-indigo-700"
+        class="fixed bottom-6 right-6 z-[60] flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-4 font-semibold text-white shadow-2xl shadow-indigo-900/30 transition hover:-translate-y-0.5 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus:ring-indigo-700"
         aria-label={isChatOpen ? "Close chat" : "Open chat"}
       >
         {isChatOpen ? <X size={22} /> : <MessageCircle size={22} />}
