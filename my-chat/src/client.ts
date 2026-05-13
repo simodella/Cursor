@@ -1,11 +1,17 @@
 import { Client, Key } from "@relevanceai/sdk";
 import { AGENT_ID, PROJECT, REGION, WORKFORCE_ID } from "@/constant";
-import { client } from "@/signals";
+import { client, connectionError } from "@/signals";
 
 Promise.resolve(tryStoredEmbedKey())
   .then((key) => key ?? generateEmbedKey())
   .then((key) => {
     client.value = new Client(key);
+    connectionError.value = undefined;
+  })
+  .catch((error) => {
+    console.error("Failed to initialize Relevance client", error);
+    connectionError.value =
+      "Unable to initialize the chat client. Check the Vite environment values.";
   });
 
 async function generateEmbedKey() {

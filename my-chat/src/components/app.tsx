@@ -12,7 +12,13 @@ import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
 import { LandingPage } from "@/components/landing-page";
 import { UserMessage } from "@/components/user-message";
-import { agent, isAgentTyping, messages, workforce } from "@/signals";
+import {
+  agent,
+  connectionError,
+  isAgentTyping,
+  messages,
+  workforce,
+} from "@/signals";
 
 export function App() {
   const [isChatOpen, setIsChatOpen] = useState(true);
@@ -66,7 +72,7 @@ export function App() {
             </>
           ) : (
             <main class="flex min-h-0 flex-1 items-center justify-center bg-zinc-50 p-6 text-center text-sm font-medium text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
-              Connecting assistant...
+              {connectionError.value || "Connecting assistant..."}
             </main>
           )}
         </section>

@@ -16,6 +16,7 @@ export const task = signal<Task>();
 export const messages = signal<(AgentMessage | UserMessage)[]>([]);
 export const isAgentTyping = signal(false);
 export const isAwaitingAgentResponse = signal(false);
+export const connectionError = signal<string>();
 export const isDarkMode = signal(
   localStorage.getItem("darkMode") === "true" ||
     (localStorage.getItem("darkMode") === "false"
@@ -168,13 +169,28 @@ effect(() => {
 effect(() => {
   if (client.value) {
     if (WORKFORCE_ID) {
-      Workforce.get(WORKFORCE_ID, client.value).then((w) => {
-        workforce.value = w;
-      });
+      Workforce.get(WORKFORCE_ID, client.value)
+        .then((w) => {
+          workforce.value = w;
+          connectionError.value = undefined;
+        })
+        .catch((error) => {
+          console.error("Failed to load workforce", error);
+          connectionError.value = "Unable to connect to the workforce.";
+        });
     } else if (AGENT_ID) {
-      Agent.get(AGENT_ID, client.value).then((a) => {
-        agent.value = a;
-      });
+      Agent.get(AGENT_ID, client.value)
+        .then((a) => {
+          agent.value = a;
+          connectionError.value = undefined;
+        })
+        .catch((error) => {
+          console.error("Failed to load agent", error);
+          connectionError.value = "Unable to connect to the agent.";
+        });
+    } else {
+      connectionError.value =
+        "Missing VITE_WORKFORCE_ID or VITE_AGENT_ID configuration.";
     }
   }
 });
